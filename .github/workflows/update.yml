@@ -2,7 +2,7 @@ name: update-starlink-edl
 
 on:
   schedule:
-    - cron: "17 3 * * *"      # tous les jours, 03:17 UTC
+    - cron: "17 3 * * *"      # every day at 03:17 UTC
   workflow_dispatch:
 
 permissions:
@@ -16,22 +16,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Generer les listes
+      - name: Build the lists
         run: python update.py
-      - name: Publier si le contenu a change
+      - name: Publish if the content changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add starlink-ipv4.txt starlink-ipv6.txt
-          # GitHub desactive les workflows planifies apres 60 jours sans activite du depot
+          # GitHub disables scheduled workflows after 60 days without repository activity
           last=$(git log -1 --format=%ct)
           if [ $(( $(date +%s) - last )) -gt 3888000 ]; then
             date -u +"%Y-%m-%dT%H:%M:%SZ" > HEARTBEAT
             git add HEARTBEAT
           fi
           if git diff --cached --quiet; then
-            echo "aucun changement"
+            echo "no change"
           else
-            git commit -m "Mise a jour des prefixes Starlink"
+            git commit -m "Update Starlink prefixes"
             git push
           fi

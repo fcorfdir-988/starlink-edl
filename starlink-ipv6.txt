@@ -1,5 +1,5 @@
-# Starlink (SpaceX) - prefixes du geofeed officiel https://geoip.starlinkisp.net/feed.csv
-# Agreges (aucun doublon). Liste destinee a une External Dynamic List (type IP).
+# Starlink (SpaceX) prefixes from the official geofeed https://geoip.starlinkisp.net/feed.csv
+# Aggregated, no duplicates. Meant to be used as an External Dynamic List (IP type).
 # IPv6: 1493 prefixes
 2401:e320::/36
 2406:2d40::/35

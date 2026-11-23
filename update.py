@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Genere des listes de prefixes Starlink utilisables comme External Dynamic List (EDL).
+"""Build Starlink prefix lists usable as External Dynamic Lists (EDL) on a firewall.
 
-Source : geofeed officiel de Starlink (RFC 8805), https://geoip.starlinkisp.net/feed.csv
-Sorties : starlink-ipv4.txt et starlink-ipv6.txt, un prefixe par ligne, agreges.
-Le script ne modifie les fichiers que si le contenu change, et refuse de publier
-une liste anormalement petite (telechargement tronque ou format change).
+Source:  Starlink's official geofeed (RFC 8805), https://geoip.starlinkisp.net/feed.csv
+Output:  starlink-ipv4.txt and starlink-ipv6.txt, one aggregated prefix per line.
+
+The files are only rewritten when their content changes, and the script refuses to
+publish an abnormally small list (truncated download or changed feed format), so the
+previous files stay in place if anything goes wrong.
 """
 import ipaddress
 import pathlib
@@ -13,15 +15,16 @@ import time
 import urllib.request
 
 URL = "https://geoip.starlinkisp.net/feed.csv"
-MIN_V4, MIN_V6 = 1000, 1000          # garde-fou sur le nombre de lignes du flux
-MAX_ENTRIES = 50000                  # capacite d'une EDL PAN-OS de type IP
+MIN_V4, MIN_V6 = 1000, 1000          # sanity check on the number of feed lines per family
+MAX_ENTRIES = 50000                  # capacity of a PAN-OS IP-type EDL
 HEADER = [
-    "# Starlink (SpaceX) - prefixes du geofeed officiel https://geoip.starlinkisp.net/feed.csv",
-    "# Agreges (aucun doublon). Liste destinee a une External Dynamic List (type IP).",
+    "# Starlink (SpaceX) prefixes from the official geofeed https://geoip.starlinkisp.net/feed.csv",
+    "# Aggregated, no duplicates. Meant to be used as an External Dynamic List (IP type).",
 ]
 
 
 def fetch() -> str:
+    """Download the geofeed, with three attempts."""
     last = None
     for attempt in range(1, 4):
         try:
@@ -31,10 +34,11 @@ def fetch() -> str:
         except Exception as e:                      # noqa: BLE001
             last = e
             time.sleep(5 * attempt)
-    sys.exit(f"telechargement impossible: {last}")
+    sys.exit(f"download failed: {last}")
 
 
 def parse(text: str):
+    """Return the IPv4 and IPv6 networks listed in the first CSV column."""
     v4, v6 = [], []
     for line in text.splitlines():
         line = line.strip()
@@ -60,16 +64,17 @@ def write_if_changed(path: pathlib.Path, nets, label: str) -> bool:
 def main() -> None:
     v4, v6 = parse(fetch())
     if len(v4) < MIN_V4 or len(v6) < MIN_V6:
-        sys.exit(f"flux suspect: {len(v4)} IPv4 / {len(v6)} IPv6 (minimum {MIN_V4}/{MIN_V6}), rien n'est publie")
+        sys.exit(f"suspicious feed: {len(v4)} IPv4 / {len(v6)} IPv6 "
+                 f"(minimum {MIN_V4}/{MIN_V6}), nothing published")
     a4 = sorted(ipaddress.collapse_addresses(v4), key=lambda n: (int(n.network_address), n.prefixlen))
     a6 = sorted(ipaddress.collapse_addresses(v6), key=lambda n: (int(n.network_address), n.prefixlen))
     if len(a4) + len(a6) > MAX_ENTRIES:
-        sys.exit(f"{len(a4) + len(a6)} entrees: depasse la capacite d'une EDL ({MAX_ENTRIES})")
+        sys.exit(f"{len(a4) + len(a6)} entries: exceeds the EDL capacity ({MAX_ENTRIES})")
     here = pathlib.Path(__file__).resolve().parent
     c4 = write_if_changed(here / "starlink-ipv4.txt", a4, "IPv4")
     c6 = write_if_changed(here / "starlink-ipv6.txt", a6, "IPv6")
-    print(f"IPv4: {len(v4)} -> {len(a4)} agreges ({'modifie' if c4 else 'inchange'}) | "
-          f"IPv6: {len(v6)} -> {len(a6)} agreges ({'modifie' if c6 else 'inchange'})")
+    print(f"IPv4: {len(v4)} -> {len(a4)} aggregated ({'changed' if c4 else 'unchanged'}) | "
+          f"IPv6: {len(v6)} -> {len(a6)} aggregated ({'changed' if c6 else 'unchanged'})")
 
 
 if __name__ == "__main__":
